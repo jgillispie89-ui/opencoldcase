@@ -47,8 +47,8 @@ export default async function CasePage({ params }: PageProps) {
   // Round 2 — five queries in parallel
   const [
     { data: creator },
-    { data: rawDiscussions },
-    { data: rawTheories },
+    { data: rawDiscussions, error: discussionsError },
+    { data: rawTheories,    error: theoriesError },
     { data: viewerProfile },
     { data: rawUpvotes },
   ] = await Promise.all([
@@ -56,12 +56,14 @@ export default async function CasePage({ params }: PageProps) {
       .from('profiles').select('display_name')
       .eq('id', coldCase.created_by).single(),
 
+    // Fetch without FK-dependent join — profiles resolved manually below
     supabase
-      .from('discussions').select('*, profiles(display_name)')
+      .from('discussions').select('*')
       .eq('case_id', id).order('created_at', { ascending: false }),
 
+    // Fetch without FK-dependent join — profiles resolved manually below
     supabase
-      .from('theories').select('*, profiles(display_name)')
+      .from('theories').select('*')
       .eq('case_id', id)
       .order('upvotes',     { ascending: false })
       .order('created_at',  { ascending: false }),
@@ -75,8 +77,32 @@ export default async function CasePage({ params }: PageProps) {
       : Promise.resolve({ data: [] as { theory_id: string }[], error: null }),
   ])
 
-  const discussions = (rawDiscussions ?? []) as DiscussionRow[]
-  const theories    = (rawTheories    ?? []) as TheoryRow[]
+  if (discussionsError) console.error('[CasePage] discussions query error:', discussionsError)
+  if (theoriesError)    console.error('[CasePage] theories query error:', theoriesError)
+
+  // Round 3 — resolve author display names for both discussions and theories (manual join, no FK required)
+  const allAuthorIds = [...new Set([
+    ...(rawDiscussions ?? []).map(d => d.user_id as string),
+    ...(rawTheories    ?? []).map(t => t.user_id as string),
+  ])]
+
+  const { data: authorProfiles, error: authorProfilesError } = allAuthorIds.length > 0
+    ? await supabase.from('profiles').select('id, display_name').in('id', allAuthorIds)
+    : { data: [] as { id: string; display_name: string }[], error: null }
+
+  if (authorProfilesError) console.error('[CasePage] authorProfiles query error:', authorProfilesError)
+
+  const profileMap = Object.fromEntries((authorProfiles ?? []).map(p => [p.id, p.display_name]))
+
+  const discussions = (rawDiscussions ?? []).map(d => ({
+    ...d,
+    profiles: { display_name: profileMap[d.user_id as string] ?? null },
+  })) as DiscussionRow[]
+
+  const theories = (rawTheories ?? []).map(t => ({
+    ...t,
+    profiles: { display_name: profileMap[t.user_id as string] ?? null },
+  })) as TheoryRow[]
 
   // Only keep upvote IDs that belong to theories on this case
   const caseTheoryIds   = new Set(theories.map(t => t.id))
