@@ -1,15 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import Discussion, { type DiscussionRow } from './Discussion'
 
 type Tab = 'discussion' | 'evidence' | 'theories' | 'notebook'
 
-const TAB_STUBS: Record<Tab, { icon: string; heading: string; body: string }> = {
-  discussion: {
-    icon: '💬',
-    heading: 'Discussion coming soon',
-    body: 'Public conversation about this case will appear here. Anyone can read; sign in to participate.',
-  },
+const STUBS: Record<Exclude<Tab, 'discussion'>, { icon: string; heading: string; body: string }> = {
   evidence: {
     icon: '🗂',
     heading: 'Evidence coming soon',
@@ -28,10 +24,15 @@ const TAB_STUBS: Record<Tab, { icon: string; heading: string; body: string }> = 
 }
 
 interface Props {
+  caseId: string
   isLoggedIn: boolean
+  userDisplayName: string | null
+  initialDiscussions: DiscussionRow[]
 }
 
-export default function CaseTabs({ isLoggedIn }: Props) {
+export default function CaseTabs({
+  caseId, isLoggedIn, userDisplayName, initialDiscussions,
+}: Props) {
   const [active, setActive] = useState<Tab>('discussion')
 
   const tabs: { id: Tab; label: string }[] = [
@@ -41,13 +42,11 @@ export default function CaseTabs({ isLoggedIn }: Props) {
     ...(isLoggedIn ? [{ id: 'notebook' as Tab, label: 'My Notebook' }] : []),
   ]
 
-  const stub = TAB_STUBS[active]
-
   return (
     <div className="mt-8">
       {/* Tab bar */}
       <div className="flex border-b border-neutral-800 overflow-x-auto">
-        {tabs.map((tab) => (
+        {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActive(tab.id)}
@@ -64,12 +63,27 @@ export default function CaseTabs({ isLoggedIn }: Props) {
       </div>
 
       {/* Tab content */}
-      <div className="py-16 flex flex-col items-center text-center">
-        <div className="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center mb-4 text-2xl">
-          {stub.icon}
-        </div>
-        <p className="text-neutral-200 font-semibold">{stub.heading}</p>
-        <p className="text-neutral-500 text-sm mt-1.5 max-w-sm">{stub.body}</p>
+      <div className="py-6">
+        {active === 'discussion' ? (
+          <Discussion
+            caseId={caseId}
+            isLoggedIn={isLoggedIn}
+            userDisplayName={userDisplayName}
+            initialDiscussions={initialDiscussions}
+          />
+        ) : (
+          <div className="py-10 flex flex-col items-center text-center">
+            <div className="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center mb-4 text-2xl">
+              {STUBS[active as Exclude<Tab, 'discussion'>].icon}
+            </div>
+            <p className="text-neutral-200 font-semibold">
+              {STUBS[active as Exclude<Tab, 'discussion'>].heading}
+            </p>
+            <p className="text-neutral-500 text-sm mt-1.5 max-w-sm">
+              {STUBS[active as Exclude<Tab, 'discussion'>].body}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )

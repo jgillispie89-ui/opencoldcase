@@ -4,6 +4,7 @@ import Navbar from '@/components/ui/Navbar'
 import CaseTabs from '@/components/cases/CaseTabs'
 import { createClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
+import type { DiscussionRow } from '@/components/cases/Discussion'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -34,6 +35,7 @@ export default async function CasePage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()
 
+  // Round 1: case data + auth (parallel)
   const [{ data: coldCase, error }, { data: { user } }] = await Promise.all([
     supabase.from('cases').select('*').eq('id', id).single(),
     supabase.auth.getUser(),
@@ -41,17 +43,29 @@ export default async function CasePage({ params }: PageProps) {
 
   if (error || !coldCase) notFound()
 
-  // Fetch creator display name
-  const { data: creator } = await supabase
-    .from('profiles')
-    .select('display_name')
-    .eq('id', coldCase.created_by)
-    .single()
+  // Round 2: creator profile + discussions + viewer profile (all parallel)
+  const [
+    { data: creator },
+    { data: rawDiscussions },
+    { data: viewerProfile },
+  ] = await Promise.all([
+    supabase.from('profiles').select('display_name').eq('id', coldCase.created_by).single(),
+    supabase.from('discussions')
+      .select('*, profiles(display_name)')
+      .eq('case_id', id)
+      .order('created_at', { ascending: false }),
+    user
+      ? supabase.from('profiles').select('display_name').eq('id', user.id).single()
+      : Promise.resolve({ data: null, error: null }),
+  ])
 
-  const isCreator   = user?.id === coldCase.created_by
-  const isLoggedIn  = !!user
-  const status      = STATUS_CONFIG[coldCase.status] ?? STATUS_CONFIG.unsolved
-  const formattedDate = formatDate(coldCase.date_of_incident)
+  const discussions: DiscussionRow[] = (rawDiscussions ?? []) as DiscussionRow[]
+
+  const isCreator        = user?.id === coldCase.created_by
+  const isLoggedIn       = !!user
+  const userDisplayName  = viewerProfile?.display_name ?? null
+  const status           = STATUS_CONFIG[coldCase.status] ?? STATUS_CONFIG.unsolved
+  const formattedDate    = formatDate(coldCase.date_of_incident)
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -63,7 +77,7 @@ export default async function CasePage({ params }: PageProps) {
         <div className="flex items-center justify-between mb-6">
           <Link
             href="/"
-            className="text-sm text-neutral-500 hover:text-neutral-300 transition-colors flex items-center gap-1.5"
+            className="text-sm text-neutral-500 hover:text-neutral-300 transition-colors"
           >
             ← Back to map
           </Link>
@@ -79,14 +93,10 @@ export default async function CasePage({ params }: PageProps) {
 
         {/* Case header */}
         <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 mb-1">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="flex-1 min-w-0">
-              <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full mb-3 ${status.className}`}>
-                {status.label}
-              </span>
-              <h1 className="text-2xl font-bold text-neutral-100 leading-snug">{coldCase.title}</h1>
-            </div>
-          </div>
+          <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full mb-3 ${status.className}`}>
+            {status.label}
+          </span>
+          <h1 className="text-2xl font-bold text-neutral-100 leading-snug">{coldCase.title}</h1>
 
           {/* Meta row */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4 text-sm text-neutral-400">
@@ -106,9 +116,8 @@ export default async function CasePage({ params }: PageProps) {
                 Victim: <span className="text-neutral-300">{coldCase.victim_name}</span>
               </span>
             )}
-            <span className="flex items-center gap-1.5 text-neutral-600 text-xs">
-              Submitted by{' '}
-              <span className="text-neutral-500">{creator?.display_name ?? 'unknown'}</span>
+            <span className="text-neutral-600 text-xs">
+              Submitted by <span className="text-neutral-500">{creator?.display_name ?? 'unknown'}</span>
             </span>
           </div>
 
@@ -121,7 +130,12 @@ export default async function CasePage({ params }: PageProps) {
         </div>
 
         {/* Tabs */}
-        <CaseTabs isLoggedIn={isLoggedIn} />
+        <CaseTabs
+          caseId={id}
+          isLoggedIn={isLoggedIn}
+          userDisplayName={userDisplayName}
+          initialDiscussions={discussions}
+        />
       </main>
     </div>
   )
