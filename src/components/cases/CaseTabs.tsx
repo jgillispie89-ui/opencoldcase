@@ -2,19 +2,15 @@
 
 import { useState } from 'react'
 import Discussion, { type DiscussionRow } from './Discussion'
+import Theories,   { type TheoryRow }    from './Theories'
 
 type Tab = 'discussion' | 'evidence' | 'theories' | 'notebook'
 
-const STUBS: Record<Exclude<Tab, 'discussion'>, { icon: string; heading: string; body: string }> = {
+const STUBS: Record<'evidence' | 'notebook', { icon: string; heading: string; body: string }> = {
   evidence: {
     icon: '🗂',
     heading: 'Evidence coming soon',
     body: 'Community-submitted links, documents, and files related to this case.',
-  },
-  theories: {
-    icon: '🔍',
-    heading: 'Theories coming soon',
-    body: 'Read and upvote theories from fellow investigators, or post your own.',
   },
   notebook: {
     icon: '📓',
@@ -26,12 +22,16 @@ const STUBS: Record<Exclude<Tab, 'discussion'>, { icon: string; heading: string;
 interface Props {
   caseId: string
   isLoggedIn: boolean
+  userId: string | null
   userDisplayName: string | null
   initialDiscussions: DiscussionRow[]
+  initialTheories: TheoryRow[]
+  initialUpvotedIds: string[]
 }
 
 export default function CaseTabs({
-  caseId, isLoggedIn, userDisplayName, initialDiscussions,
+  caseId, isLoggedIn, userId, userDisplayName,
+  initialDiscussions, initialTheories, initialUpvotedIds,
 }: Props) {
   const [active, setActive] = useState<Tab>('discussion')
 
@@ -64,24 +64,31 @@ export default function CaseTabs({
 
       {/* Tab content */}
       <div className="py-6">
-        {active === 'discussion' ? (
+        {active === 'discussion' && (
           <Discussion
             caseId={caseId}
             isLoggedIn={isLoggedIn}
             userDisplayName={userDisplayName}
             initialDiscussions={initialDiscussions}
           />
-        ) : (
+        )}
+        {active === 'theories' && (
+          <Theories
+            caseId={caseId}
+            isLoggedIn={isLoggedIn}
+            userId={userId}
+            userDisplayName={userDisplayName}
+            initialTheories={initialTheories}
+            initialUpvotedIds={initialUpvotedIds}
+          />
+        )}
+        {(active === 'evidence' || active === 'notebook') && (
           <div className="py-10 flex flex-col items-center text-center">
             <div className="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center mb-4 text-2xl">
-              {STUBS[active as Exclude<Tab, 'discussion'>].icon}
+              {STUBS[active].icon}
             </div>
-            <p className="text-neutral-200 font-semibold">
-              {STUBS[active as Exclude<Tab, 'discussion'>].heading}
-            </p>
-            <p className="text-neutral-500 text-sm mt-1.5 max-w-sm">
-              {STUBS[active as Exclude<Tab, 'discussion'>].body}
-            </p>
+            <p className="text-neutral-200 font-semibold">{STUBS[active].heading}</p>
+            <p className="text-neutral-500 text-sm mt-1.5 max-w-sm">{STUBS[active].body}</p>
           </div>
         )}
       </div>

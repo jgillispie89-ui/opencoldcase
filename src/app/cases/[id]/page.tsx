@@ -5,6 +5,7 @@ import CaseTabs from '@/components/cases/CaseTabs'
 import { createClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
 import type { DiscussionRow } from '@/components/cases/Discussion'
+import type { TheoryRow }    from '@/components/cases/Theories'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -35,7 +36,7 @@ export default async function CasePage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()
 
-  // Round 1: case data + auth (parallel)
+  // Round 1 — case + auth in parallel
   const [{ data: coldCase, error }, { data: { user } }] = await Promise.all([
     supabase.from('cases').select('*').eq('id', id).single(),
     supabase.auth.getUser(),
@@ -43,29 +44,52 @@ export default async function CasePage({ params }: PageProps) {
 
   if (error || !coldCase) notFound()
 
-  // Round 2: creator profile + discussions + viewer profile (all parallel)
+  // Round 2 — five queries in parallel
   const [
     { data: creator },
     { data: rawDiscussions },
+    { data: rawTheories },
     { data: viewerProfile },
+    { data: rawUpvotes },
   ] = await Promise.all([
-    supabase.from('profiles').select('display_name').eq('id', coldCase.created_by).single(),
-    supabase.from('discussions')
-      .select('*, profiles(display_name)')
+    supabase
+      .from('profiles').select('display_name')
+      .eq('id', coldCase.created_by).single(),
+
+    supabase
+      .from('discussions').select('*, profiles(display_name)')
+      .eq('case_id', id).order('created_at', { ascending: false }),
+
+    supabase
+      .from('theories').select('*, profiles(display_name)')
       .eq('case_id', id)
-      .order('created_at', { ascending: false }),
+      .order('upvotes',     { ascending: false })
+      .order('created_at',  { ascending: false }),
+
     user
       ? supabase.from('profiles').select('display_name').eq('id', user.id).single()
       : Promise.resolve({ data: null, error: null }),
+
+    user
+      ? supabase.from('theory_upvotes').select('theory_id').eq('user_id', user.id)
+      : Promise.resolve({ data: [] as { theory_id: string }[], error: null }),
   ])
 
-  const discussions: DiscussionRow[] = (rawDiscussions ?? []) as DiscussionRow[]
+  const discussions = (rawDiscussions ?? []) as DiscussionRow[]
+  const theories    = (rawTheories    ?? []) as TheoryRow[]
 
-  const isCreator        = user?.id === coldCase.created_by
-  const isLoggedIn       = !!user
-  const userDisplayName  = viewerProfile?.display_name ?? null
-  const status           = STATUS_CONFIG[coldCase.status] ?? STATUS_CONFIG.unsolved
-  const formattedDate    = formatDate(coldCase.date_of_incident)
+  // Only keep upvote IDs that belong to theories on this case
+  const caseTheoryIds   = new Set(theories.map(t => t.id))
+  const upvotedIds      = (rawUpvotes ?? [])
+    .map(r => r.theory_id)
+    .filter(id => caseTheoryIds.has(id))
+
+  const isCreator       = user?.id === coldCase.created_by
+  const isLoggedIn      = !!user
+  const userId          = user?.id ?? null
+  const userDisplayName = viewerProfile?.display_name ?? null
+  const status          = STATUS_CONFIG[coldCase.status] ?? STATUS_CONFIG.unsolved
+  const formattedDate   = formatDate(coldCase.date_of_incident)
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -98,7 +122,6 @@ export default async function CasePage({ params }: PageProps) {
           </span>
           <h1 className="text-2xl font-bold text-neutral-100 leading-snug">{coldCase.title}</h1>
 
-          {/* Meta row */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4 text-sm text-neutral-400">
             <span className="flex items-center gap-1.5">
               <span className="text-neutral-600">📍</span>
@@ -121,7 +144,6 @@ export default async function CasePage({ params }: PageProps) {
             </span>
           </div>
 
-          {/* Description */}
           <div className="mt-5 pt-5 border-t border-neutral-800">
             <p className="text-neutral-300 text-sm leading-relaxed whitespace-pre-wrap">
               {coldCase.description}
@@ -133,8 +155,11 @@ export default async function CasePage({ params }: PageProps) {
         <CaseTabs
           caseId={id}
           isLoggedIn={isLoggedIn}
+          userId={userId}
           userDisplayName={userDisplayName}
           initialDiscussions={discussions}
+          initialTheories={theories}
+          initialUpvotedIds={upvotedIds}
         />
       </main>
     </div>
