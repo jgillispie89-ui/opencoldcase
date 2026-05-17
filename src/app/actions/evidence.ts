@@ -15,8 +15,7 @@ export async function postEvidence(
 
     if (!user)  return { error: 'You must be signed in to submit evidence.' }
     if (!title) return { error: 'Title is required.' }
-    if (!fileUrl && !sourceUrl) return { error: 'Provide either a file or a URL.' }
-    if (fileUrl && sourceUrl)   return { error: 'Provide a file or a URL, not both.' }
+    if (!description && !fileUrl && !sourceUrl) return { error: 'Add a description, file, or source link.' }
 
     const { data, error } = await supabase
       .from('evidence')

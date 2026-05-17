@@ -57,8 +57,6 @@ function fileName(url: string): string {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-type Mode = 'file' | 'link'
-
 interface Props {
   caseId: string
   isLoggedIn: boolean
@@ -76,16 +74,17 @@ const inputCls = [
 export default function Evidence({
   caseId, isLoggedIn, userId, userDisplayName, initialEvidence,
 }: Props) {
-  const [items,       setItems]       = useState<EvidenceRow[]>(initialEvidence)
-  const [mode,        setMode]        = useState<Mode>('link')
-  const [title,       setTitle]       = useState('')
-  const [description, setDescription] = useState('')
-  const [sourceUrl,   setSourceUrl]   = useState('')
-  const [file,        setFile]        = useState<File | null>(null)
-  const [formError,   setFormError]   = useState<string | null>(null)
-  const [saveError,   setSaveError]   = useState<string | null>(null)
+  const [items,        setItems]        = useState<EvidenceRow[]>(initialEvidence)
+  const [title,        setTitle]        = useState('')
+  const [description,  setDescription]  = useState('')
+  const [sourceUrl,    setSourceUrl]    = useState('')
+  const [file,         setFile]         = useState<File | null>(null)
+  const [formError,    setFormError]    = useState<string | null>(null)
+  const [saveError,    setSaveError]    = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lightboxUrl,  setLightboxUrl]  = useState<string | null>(null)
+
+  const hasContent = description.trim() || file || sourceUrl.trim()
 
   // ── Submit ──────────────────────────────────────────────────────────────────
 
@@ -95,9 +94,8 @@ export default function Evidence({
     const trimDesc  = description.trim()
     const trimUrl   = sourceUrl.trim()
 
-    if (!trimTitle)                          { setFormError('Title is required.');           return }
-    if (mode === 'link' && !trimUrl)         { setFormError('URL is required.');             return }
-    if (mode === 'file' && !file)            { setFormError('Please choose a file.');        return }
+    if (!trimTitle)                          { setFormError('Title is required.');                         return }
+    if (!trimDesc && !file && !trimUrl)      { setFormError('Add a description, file, or source link.');  return }
 
     setFormError(null)
     setSaveError(null)
@@ -107,8 +105,8 @@ export default function Evidence({
     const optimistic: EvidenceRow = {
       id: tempId, case_id: caseId, user_id: userId ?? 'pending',
       title: trimTitle, description: trimDesc || null,
-      file_url: mode === 'file' ? null : null,
-      source_url: mode === 'link' ? trimUrl : null,
+      file_url: null,
+      source_url: trimUrl || null,
       created_at: new Date().toISOString(),
       profiles: { display_name: userDisplayName ?? 'You' },
       _optimistic: true,
@@ -122,7 +120,7 @@ export default function Evidence({
     try {
       let resolvedFileUrl: string | null = null
 
-      if (mode === 'file' && file) {
+      if (file) {
         const supabase = createClient()
         const ext  = file.name.split('.').pop() ?? 'bin'
         const path = `${caseId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
@@ -135,6 +133,7 @@ export default function Evidence({
           setItems(prev => prev.filter(i => i.id !== tempId))
           setTitle(trimTitle)
           setDescription(trimDesc)
+          setSourceUrl(trimUrl)
           setFile(file)
           setSaveError(`Upload failed: ${uploadError.message}`)
           setIsSubmitting(false)
@@ -144,22 +143,18 @@ export default function Evidence({
         const { data: { publicUrl } } = supabase.storage.from('evidence').getPublicUrl(upload.path)
         resolvedFileUrl = publicUrl
 
-        // Patch the optimistic card with the real URL so the thumbnail shows
+        // Patch the optimistic card with the real URL so the thumbnail shows immediately
         setItems(prev => prev.map(i => i.id === tempId ? { ...i, file_url: publicUrl } : i))
       }
 
-      const result = await postEvidence(
-        caseId, trimTitle, trimDesc,
-        resolvedFileUrl,
-        mode === 'link' ? trimUrl : null,
-      )
+      const result = await postEvidence(caseId, trimTitle, trimDesc, resolvedFileUrl, trimUrl || null)
 
       if (result?.error) {
         console.error('[Evidence] postEvidence returned error:', result.error)
         setItems(prev => prev.filter(i => i.id !== tempId))
         setTitle(trimTitle)
         setDescription(trimDesc)
-        if (mode === 'link') setSourceUrl(trimUrl)
+        setSourceUrl(trimUrl)
         setSaveError(result.error)
       } else if (result?.evidence) {
         setItems(prev =>
@@ -174,7 +169,7 @@ export default function Evidence({
       setItems(prev => prev.filter(i => i.id !== tempId))
       setTitle(trimTitle)
       setDescription(trimDesc)
-      if (mode === 'link') setSourceUrl(trimUrl)
+      setSourceUrl(trimUrl)
       setSaveError('An unexpected error occurred. Please try again.')
     } finally {
       setIsSubmitting(false)
@@ -236,55 +231,46 @@ export default function Evidence({
             className={`${inputCls} resize-y min-h-[64px]`}
           />
 
-          {/* Mode toggle */}
-          <div className="flex gap-4 text-sm">
-            {(['link', 'file'] as Mode[]).map(m => (
-              <label key={m} className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="radio"
-                  name="evidence-mode"
-                  value={m}
-                  checked={mode === m}
-                  onChange={() => { setMode(m); setFormError(null) }}
-                  className="accent-red-500"
-                />
-                <span className={mode === m ? 'text-neutral-200' : 'text-neutral-500'}>
-                  {m === 'link' ? 'Add a link' : 'Upload a file'}
-                </span>
-              </label>
-            ))}
-          </div>
-
-          {mode === 'link' ? (
+          {/* File upload */}
+          <label className="flex items-center justify-center w-full border border-dashed border-neutral-600 rounded-lg px-4 py-4 cursor-pointer hover:border-neutral-500 transition-colors bg-neutral-800/50 text-sm text-neutral-400 gap-2">
+            <span>📎</span>
+            <span>{file ? file.name : 'Attach a file — image, PDF, or document (optional)'}</span>
+            {file && (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={ev => { ev.preventDefault(); setFile(null) }}
+                onKeyDown={ev => ev.key === 'Enter' && (ev.preventDefault(), setFile(null))}
+                className="ml-auto text-neutral-600 hover:text-neutral-400 transition-colors"
+                aria-label="Remove file"
+              >
+                ×
+              </span>
+            )}
             <input
-              type="url"
-              value={sourceUrl}
-              onChange={e => setSourceUrl(e.target.value)}
-              placeholder="https://example.com/article"
-              className={inputCls}
+              type="file"
+              className="hidden"
+              accept="image/*,.pdf,.doc,.docx,.txt,.csv"
+              onChange={e => setFile(e.target.files?.[0] ?? null)}
             />
-          ) : (
-            <div>
-              <label className="flex items-center justify-center w-full border border-dashed border-neutral-600 rounded-lg px-4 py-5 cursor-pointer hover:border-neutral-500 transition-colors bg-neutral-800/50 text-sm text-neutral-400 gap-2">
-                <span>📎</span>
-                <span>{file ? file.name : 'Choose file — image, PDF, or document'}</span>
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*,.pdf,.doc,.docx,.txt,.csv"
-                  onChange={e => setFile(e.target.files?.[0] ?? null)}
-                />
-              </label>
-            </div>
-          )}
+          </label>
+
+          {/* Source URL */}
+          <input
+            type="url"
+            value={sourceUrl}
+            onChange={e => setSourceUrl(e.target.value)}
+            placeholder="Source URL (optional) — link to a news article, document, or webpage"
+            className={inputCls}
+          />
 
           <div className="flex justify-end">
             <button
               type="submit"
-              disabled={isSubmitting || !title.trim() || (mode === 'link' ? !sourceUrl.trim() : !file)}
+              disabled={isSubmitting || !title.trim() || !hasContent}
               className="bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
             >
-              {isSubmitting ? (mode === 'file' ? 'Uploading…' : 'Adding…') : 'Add evidence'}
+              {isSubmitting ? (file ? 'Uploading…' : 'Adding…') : 'Add evidence'}
             </button>
           </div>
         </form>
@@ -330,7 +316,7 @@ export default function Evidence({
                   item._optimistic ? 'opacity-60 border-neutral-700' : 'border-neutral-800'
                 }`}
               >
-                {/* Image thumbnail */}
+                {/* Image thumbnail — full width above card body */}
                 {item.file_url && isImage(item.file_url) && (
                   <button
                     onClick={() => !item._optimistic && setLightboxUrl(item.file_url!)}
@@ -353,41 +339,43 @@ export default function Evidence({
                     {item.title}
                   </h3>
 
-                  {/* Description */}
-                  {item.description && (
-                    <p className="text-sm text-neutral-400 leading-relaxed mb-3">
-                      {item.description}
-                    </p>
-                  )}
-
-                  {/* File link (non-image) */}
+                  {/* Non-image file download */}
                   {item.file_url && !isImage(item.file_url) && (
                     <a
                       href={item.file_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors mb-3"
+                      className="inline-flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors mt-1 mb-2"
                     >
                       <span>{fileIcon(item.file_url)}</span>
                       <span className="underline underline-offset-2">{fileName(item.file_url)}</span>
                     </a>
                   )}
 
+                  {/* Description */}
+                  {item.description && (
+                    <p className="text-sm text-neutral-400 leading-relaxed mt-1 mb-2">
+                      {item.description}
+                    </p>
+                  )}
+
                   {/* Source URL */}
                   {item.source_url && (
-                    <a
-                      href={item.source_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors mb-3 break-all"
-                    >
-                      <span>🔗</span>
-                      <span className="underline underline-offset-2 truncate max-w-xs sm:max-w-sm">{item.source_url}</span>
-                    </a>
+                    <div className="flex items-start gap-1.5 mt-1 mb-2">
+                      <span className="text-xs text-neutral-600 mt-0.5 shrink-0">Source:</span>
+                      <a
+                        href={item.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-red-400 hover:text-red-300 underline underline-offset-2 transition-colors break-all"
+                      >
+                        {item.source_url}
+                      </a>
+                    </div>
                   )}
 
                   {/* Footer */}
-                  <div className="flex items-center gap-1.5 text-xs text-neutral-500 mt-2 pt-3 border-t border-neutral-800">
+                  <div className="flex items-center gap-1.5 text-xs text-neutral-500 mt-3 pt-3 border-t border-neutral-800">
                     <span className="text-neutral-300 font-medium">{name}</span>
                     <span>·</span>
                     <span>{relativeTime(item.created_at)}</span>
