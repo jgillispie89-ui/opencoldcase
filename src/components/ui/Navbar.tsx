@@ -7,13 +7,15 @@ export default async function Navbar() {
   const { data: { user } } = await supabase.auth.getUser()
 
   let displayName: string | null = null
+  let isSuperAdmin = false
   if (user) {
     const { data } = await supabase
       .from('profiles')
-      .select('display_name')
+      .select('display_name, role')
       .eq('id', user.id)
       .single()
-    displayName = data?.display_name ?? null
+    displayName  = data?.display_name ?? null
+    isSuperAdmin = data?.role === 'super_admin'
   }
 
   return (
@@ -29,8 +31,13 @@ export default async function Navbar() {
 
         {user ? (
           <>
-            <span className="text-neutral-300 font-medium">
-              {displayName ?? user.email}
+            <span className="flex items-center gap-2">
+              <span className="text-neutral-300 font-medium">{displayName ?? user.email}</span>
+              {isSuperAdmin && (
+                <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 leading-none">
+                  Admin
+                </span>
+              )}
             </span>
             <SignOutButton />
             <Link

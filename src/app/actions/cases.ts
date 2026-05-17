@@ -36,6 +36,11 @@ function validateCaseFields(f: ReturnType<typeof parseCaseForm>): string | null 
   return null
 }
 
+async function checkSuperAdmin(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<boolean> {
+  const { data } = await supabase.from('profiles').select('role').eq('id', userId).single()
+  return data?.role === 'super_admin'
+}
+
 export async function submitCase(
   prevState: CaseFormState,
   formData: FormData
@@ -77,8 +82,9 @@ export async function updateCase(
 
     const { data: existing } = await supabase
       .from('cases').select('created_by').eq('id', caseId).single()
-    if (!existing)               return { error: 'Case not found.' }
-    if (existing.created_by !== user.id) return { error: 'You do not have permission to edit this case.' }
+    if (!existing) return { error: 'Case not found.' }
+    if (existing.created_by !== user.id && !(await checkSuperAdmin(supabase, user.id)))
+      return { error: 'You do not have permission to edit this case.' }
 
     const f = parseCaseForm(formData)
     const validationError = validateCaseFields(f)
@@ -109,8 +115,9 @@ export async function deleteCase(caseId: string): Promise<{ error?: string }> {
 
     const { data: existing } = await supabase
       .from('cases').select('created_by').eq('id', caseId).single()
-    if (!existing)               return { error: 'Case not found.' }
-    if (existing.created_by !== user.id) return { error: 'You do not have permission to delete this case.' }
+    if (!existing) return { error: 'Case not found.' }
+    if (existing.created_by !== user.id && !(await checkSuperAdmin(supabase, user.id)))
+      return { error: 'You do not have permission to delete this case.' }
 
     const { error } = await supabase.from('cases').delete().eq('id', caseId)
     if (error) {

@@ -28,7 +28,13 @@ export default async function EditCasePage({ params }: PageProps) {
 
   if (!user)              redirect('/login')
   if (error || !coldCase) notFound()
-  if (user.id !== coldCase.created_by) redirect(`/cases/${id}`)
+
+  const isCreator = user.id === coldCase.created_by
+  if (!isCreator) {
+    const { data: profile } = await supabase
+      .from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'super_admin') redirect(`/cases/${id}`)
+  }
 
   return (
     <div className="flex flex-col min-h-screen">

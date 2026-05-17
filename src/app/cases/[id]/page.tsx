@@ -77,7 +77,7 @@ export default async function CasePage({ params }: PageProps) {
       .order('created_at',  { ascending: false }),
 
     user
-      ? supabase.from('profiles').select('display_name').eq('id', user.id).single()
+      ? supabase.from('profiles').select('display_name, role').eq('id', user.id).single()
       : Promise.resolve({ data: null, error: null }),
 
     user
@@ -130,6 +130,7 @@ export default async function CasePage({ params }: PageProps) {
     .map(r => r.theory_id)
     .filter(id => caseTheoryIds.has(id))
 
+  const isSuperAdmin      = (viewerProfile as { role?: string } | null)?.role === 'super_admin'
   const isCreator         = user?.id === coldCase.created_by
   const isLoggedIn        = !!user
   const userId            = user?.id ?? null
@@ -152,7 +153,7 @@ export default async function CasePage({ params }: PageProps) {
           >
             ← Back to map
           </Link>
-          {isCreator && (
+          {(isCreator || isSuperAdmin) && (
             <Link
               href={`/cases/${id}/edit`}
               className="text-sm bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-300 px-4 py-1.5 rounded-lg transition-colors"
