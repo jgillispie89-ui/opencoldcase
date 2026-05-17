@@ -3,15 +3,10 @@
 import { useState } from 'react'
 import Discussion, { type DiscussionRow } from './Discussion'
 import Evidence,   { type EvidenceRow }  from './Evidence'
+import Notebook                          from './Notebook'
 import Theories,   { type TheoryRow }    from './Theories'
 
 type Tab = 'discussion' | 'evidence' | 'theories' | 'notebook'
-
-const NOTEBOOK_STUB = {
-  icon: '📓',
-  heading: 'My Notebook coming soon',
-  body: 'Your private notes on this case. Only you can see this — never shared with anyone.',
-}
 
 interface Props {
   caseId: string
@@ -22,11 +17,13 @@ interface Props {
   initialEvidence: EvidenceRow[]
   initialTheories: TheoryRow[]
   initialUpvotedIds: string[]
+  initialNotebookContent: string | null
 }
 
 export default function CaseTabs({
   caseId, isLoggedIn, userId, userDisplayName,
   initialDiscussions, initialEvidence, initialTheories, initialUpvotedIds,
+  initialNotebookContent,
 }: Props) {
   const [active, setActive] = useState<Tab>('discussion')
 
@@ -87,13 +84,10 @@ export default function CaseTabs({
           />
         )}
         {active === 'notebook' && (
-          <div className="py-10 flex flex-col items-center text-center">
-            <div className="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center mb-4 text-2xl">
-              {NOTEBOOK_STUB.icon}
-            </div>
-            <p className="text-neutral-200 font-semibold">{NOTEBOOK_STUB.heading}</p>
-            <p className="text-neutral-500 text-sm mt-1.5 max-w-sm">{NOTEBOOK_STUB.body}</p>
-          </div>
+          <Notebook
+            caseId={caseId}
+            initialContent={initialNotebookContent}
+          />
         )}
       </div>
     </div>

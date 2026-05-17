@@ -45,7 +45,7 @@ export default async function CasePage({ params }: PageProps) {
 
   if (error || !coldCase) notFound()
 
-  // Round 2 — six queries in parallel
+  // Round 2 — seven queries in parallel
   const [
     { data: creator },
     { data: rawDiscussions, error: discussionsError },
@@ -53,6 +53,7 @@ export default async function CasePage({ params }: PageProps) {
     { data: rawTheories,    error: theoriesError },
     { data: viewerProfile },
     { data: rawUpvotes },
+    { data: notebookRow },
   ] = await Promise.all([
     supabase
       .from('profiles').select('display_name')
@@ -82,6 +83,11 @@ export default async function CasePage({ params }: PageProps) {
     user
       ? supabase.from('theory_upvotes').select('theory_id').eq('user_id', user.id)
       : Promise.resolve({ data: [] as { theory_id: string }[], error: null }),
+
+    // maybeSingle — returns null data (not an error) when no notebook row exists yet
+    user
+      ? supabase.from('notebooks').select('content').eq('case_id', id).eq('user_id', user.id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ])
 
   if (discussionsError) console.error('[CasePage] discussions query error:', discussionsError)
@@ -124,10 +130,11 @@ export default async function CasePage({ params }: PageProps) {
     .map(r => r.theory_id)
     .filter(id => caseTheoryIds.has(id))
 
-  const isCreator       = user?.id === coldCase.created_by
-  const isLoggedIn      = !!user
-  const userId          = user?.id ?? null
-  const userDisplayName = viewerProfile?.display_name ?? null
+  const isCreator         = user?.id === coldCase.created_by
+  const isLoggedIn        = !!user
+  const userId            = user?.id ?? null
+  const userDisplayName   = viewerProfile?.display_name ?? null
+  const notebookContent   = notebookRow?.content ?? null
   const status          = STATUS_CONFIG[coldCase.status] ?? STATUS_CONFIG.unsolved
   const formattedDate   = formatDate(coldCase.date_of_incident)
 
@@ -201,6 +208,7 @@ export default async function CasePage({ params }: PageProps) {
           initialEvidence={evidence}
           initialTheories={theories}
           initialUpvotedIds={upvotedIds}
+          initialNotebookContent={notebookContent}
         />
       </main>
     </div>
