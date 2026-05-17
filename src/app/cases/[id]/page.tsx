@@ -5,6 +5,7 @@ import CaseTabs from '@/components/cases/CaseTabs'
 import { createClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
 import type { DiscussionRow } from '@/components/cases/Discussion'
+import type { EvidenceRow }  from '@/components/cases/Evidence'
 import type { TheoryRow }    from '@/components/cases/Theories'
 
 interface PageProps {
@@ -44,10 +45,11 @@ export default async function CasePage({ params }: PageProps) {
 
   if (error || !coldCase) notFound()
 
-  // Round 2 — five queries in parallel
+  // Round 2 — six queries in parallel
   const [
     { data: creator },
     { data: rawDiscussions, error: discussionsError },
+    { data: rawEvidence,    error: evidenceError },
     { data: rawTheories,    error: theoriesError },
     { data: viewerProfile },
     { data: rawUpvotes },
@@ -59,6 +61,11 @@ export default async function CasePage({ params }: PageProps) {
     // Fetch without FK-dependent join — profiles resolved manually below
     supabase
       .from('discussions').select('*')
+      .eq('case_id', id).order('created_at', { ascending: false }),
+
+    // Fetch without FK-dependent join — profiles resolved manually below
+    supabase
+      .from('evidence').select('*')
       .eq('case_id', id).order('created_at', { ascending: false }),
 
     // Fetch without FK-dependent join — profiles resolved manually below
@@ -78,11 +85,13 @@ export default async function CasePage({ params }: PageProps) {
   ])
 
   if (discussionsError) console.error('[CasePage] discussions query error:', discussionsError)
+  if (evidenceError)    console.error('[CasePage] evidence query error:', evidenceError)
   if (theoriesError)    console.error('[CasePage] theories query error:', theoriesError)
 
-  // Round 3 — resolve author display names for both discussions and theories (manual join, no FK required)
+  // Round 3 — resolve author display names for all three content tables (manual join, no FK required)
   const allAuthorIds = [...new Set([
     ...(rawDiscussions ?? []).map(d => d.user_id as string),
+    ...(rawEvidence    ?? []).map(e => e.user_id as string),
     ...(rawTheories    ?? []).map(t => t.user_id as string),
   ])]
 
@@ -98,6 +107,11 @@ export default async function CasePage({ params }: PageProps) {
     ...d,
     profiles: { display_name: profileMap[d.user_id as string] ?? null },
   })) as DiscussionRow[]
+
+  const evidence = (rawEvidence ?? []).map(e => ({
+    ...e,
+    profiles: { display_name: profileMap[e.user_id as string] ?? null },
+  })) as EvidenceRow[]
 
   const theories = (rawTheories ?? []).map(t => ({
     ...t,
@@ -184,6 +198,7 @@ export default async function CasePage({ params }: PageProps) {
           userId={userId}
           userDisplayName={userDisplayName}
           initialDiscussions={discussions}
+          initialEvidence={evidence}
           initialTheories={theories}
           initialUpvotedIds={upvotedIds}
         />

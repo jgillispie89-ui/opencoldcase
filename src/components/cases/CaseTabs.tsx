@@ -2,21 +2,15 @@
 
 import { useState } from 'react'
 import Discussion, { type DiscussionRow } from './Discussion'
+import Evidence,   { type EvidenceRow }  from './Evidence'
 import Theories,   { type TheoryRow }    from './Theories'
 
 type Tab = 'discussion' | 'evidence' | 'theories' | 'notebook'
 
-const STUBS: Record<'evidence' | 'notebook', { icon: string; heading: string; body: string }> = {
-  evidence: {
-    icon: '🗂',
-    heading: 'Evidence coming soon',
-    body: 'Community-submitted links, documents, and files related to this case.',
-  },
-  notebook: {
-    icon: '📓',
-    heading: 'My Notebook coming soon',
-    body: 'Your private notes on this case. Only you can see this — never shared with anyone.',
-  },
+const NOTEBOOK_STUB = {
+  icon: '📓',
+  heading: 'My Notebook coming soon',
+  body: 'Your private notes on this case. Only you can see this — never shared with anyone.',
 }
 
 interface Props {
@@ -25,13 +19,14 @@ interface Props {
   userId: string | null
   userDisplayName: string | null
   initialDiscussions: DiscussionRow[]
+  initialEvidence: EvidenceRow[]
   initialTheories: TheoryRow[]
   initialUpvotedIds: string[]
 }
 
 export default function CaseTabs({
   caseId, isLoggedIn, userId, userDisplayName,
-  initialDiscussions, initialTheories, initialUpvotedIds,
+  initialDiscussions, initialEvidence, initialTheories, initialUpvotedIds,
 }: Props) {
   const [active, setActive] = useState<Tab>('discussion')
 
@@ -72,6 +67,15 @@ export default function CaseTabs({
             initialDiscussions={initialDiscussions}
           />
         )}
+        {active === 'evidence' && (
+          <Evidence
+            caseId={caseId}
+            isLoggedIn={isLoggedIn}
+            userId={userId}
+            userDisplayName={userDisplayName}
+            initialEvidence={initialEvidence}
+          />
+        )}
         {active === 'theories' && (
           <Theories
             caseId={caseId}
@@ -82,13 +86,13 @@ export default function CaseTabs({
             initialUpvotedIds={initialUpvotedIds}
           />
         )}
-        {(active === 'evidence' || active === 'notebook') && (
+        {active === 'notebook' && (
           <div className="py-10 flex flex-col items-center text-center">
             <div className="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center mb-4 text-2xl">
-              {STUBS[active].icon}
+              {NOTEBOOK_STUB.icon}
             </div>
-            <p className="text-neutral-200 font-semibold">{STUBS[active].heading}</p>
-            <p className="text-neutral-500 text-sm mt-1.5 max-w-sm">{STUBS[active].body}</p>
+            <p className="text-neutral-200 font-semibold">{NOTEBOOK_STUB.heading}</p>
+            <p className="text-neutral-500 text-sm mt-1.5 max-w-sm">{NOTEBOOK_STUB.body}</p>
           </div>
         )}
       </div>
