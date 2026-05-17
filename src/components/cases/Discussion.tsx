@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import RelativeTime from '@/components/ui/RelativeTime'
 import { postComment } from '@/app/actions/discussions'
 
 export type DiscussionRow = {
@@ -169,7 +170,7 @@ export default function Discussion({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 flex-wrap mb-1">
                     <span className="text-sm font-semibold text-neutral-200">{name}</span>
-                    <span className="text-xs text-neutral-600">{relativeTime(comment.created_at)}</span>
+                    <span className="text-xs text-neutral-600"><RelativeTime date={comment.created_at} /></span>
                     {comment._optimistic && (
                       <span className="text-xs text-neutral-700 italic">posting…</span>
                     )}

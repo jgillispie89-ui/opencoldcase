@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import RelativeTime from '@/components/ui/RelativeTime'
 import { createClient } from '@/lib/supabase/client'
 import { postEvidence } from '@/app/actions/evidence'
 
@@ -378,7 +379,7 @@ export default function Evidence({
                   <div className="flex items-center gap-1.5 text-xs text-neutral-500 mt-3 pt-3 border-t border-neutral-800">
                     <span className="text-neutral-300 font-medium">{name}</span>
                     <span>·</span>
-                    <span>{relativeTime(item.created_at)}</span>
+                    <RelativeTime date={item.created_at} />
                     {item._optimistic && <span className="italic text-neutral-700">saving…</span>}
                   </div>
                 </div>

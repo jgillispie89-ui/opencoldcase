@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import RelativeTime from '@/components/ui/RelativeTime'
 import { postTheory, toggleUpvote } from '@/app/actions/theories'
 
 export type TheoryRow = {
@@ -276,7 +277,7 @@ export default function Theories({
                   <div className="text-xs text-neutral-500 flex items-center gap-1.5">
                     <span className="text-neutral-300 font-medium">{name}</span>
                     <span>·</span>
-                    <span>{relativeTime(theory.created_at)}</span>
+                    <RelativeTime date={theory.created_at} />
                     {theory._optimistic && <span className="italic text-neutral-700">posting…</span>}
                   </div>
 
