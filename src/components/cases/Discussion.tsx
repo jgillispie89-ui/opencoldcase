@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import RelativeTime from '@/components/ui/RelativeTime'
-import { postComment } from '@/app/actions/discussions'
+import { postComment, deleteDiscussion } from '@/app/actions/discussions'
 
 export type DiscussionRow = {
   id: string
@@ -53,17 +53,32 @@ function avatarColor(name: string): string {
 interface Props {
   caseId: string
   isLoggedIn: boolean
+  userId: string | null
+  isSuperAdmin: boolean
   userDisplayName: string | null
   initialDiscussions: DiscussionRow[]
 }
 
 export default function Discussion({
-  caseId, isLoggedIn, userDisplayName, initialDiscussions,
+  caseId, isLoggedIn, userId, isSuperAdmin, userDisplayName, initialDiscussions,
 }: Props) {
-  const [comments, setComments] = useState<DiscussionRow[]>(initialDiscussions)
-  const [content,  setContent]  = useState('')
-  const [error,    setError]    = useState<string | null>(null)
+  const [comments,     setComments]     = useState<DiscussionRow[]>(initialDiscussions)
+  const [content,      setContent]      = useState('')
+  const [error,        setError]        = useState<string | null>(null)
+  const [deleteError,  setDeleteError]  = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  async function handleDelete(commentId: string) {
+    if (!confirm('Delete this comment? This cannot be undone.')) return
+    const snapshot = comments
+    setComments(prev => prev.filter(c => c.id !== commentId))
+    setDeleteError(null)
+    const result = await deleteDiscussion(commentId)
+    if (result?.error) {
+      setComments(snapshot)
+      setDeleteError(result.error)
+    }
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -143,6 +158,12 @@ export default function Discussion({
         </div>
       )}
 
+      {deleteError && (
+        <p className="text-red-300 text-sm bg-red-950/50 border border-red-800 rounded-lg px-4 py-2.5">
+          {deleteError}
+        </p>
+      )}
+
       {/* ── Comment list ─────────────────────────────────────────────────── */}
       {comments.length === 0 ? (
         <div className="flex flex-col items-center py-14 text-center">
@@ -168,12 +189,30 @@ export default function Discussion({
 
                 {/* Body */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2 flex-wrap mb-1">
-                    <span className="text-sm font-semibold text-neutral-200">{name}</span>
-                    <span className="text-xs text-neutral-600"><RelativeTime date={comment.created_at} /></span>
-                    {comment._optimistic && (
-                      <span className="text-xs text-neutral-700 italic">posting…</span>
-                    )}
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-sm font-semibold text-neutral-200">{name}</span>
+                      <span className="text-xs text-neutral-600"><RelativeTime date={comment.created_at} /></span>
+                      {comment._optimistic && (
+                        <span className="text-xs text-neutral-700 italic">posting…</span>
+                      )}
+                    </div>
+                    {!comment._optimistic && (comment.user_id === userId || isSuperAdmin) && (() => {
+                      const isAdminAction = isSuperAdmin && comment.user_id !== userId
+                      return (
+                        <button
+                          onClick={() => handleDelete(comment.id)}
+                          title={isAdminAction ? 'Admin remove' : 'Delete'}
+                          className={`shrink-0 text-xs transition-colors ${
+                            isAdminAction
+                              ? 'text-amber-800 hover:text-amber-500'
+                              : 'text-neutral-700 hover:text-red-400'
+                          }`}
+                        >
+                          {isAdminAction ? 'Admin remove' : '×'}
+                        </button>
+                      )
+                    })()}
                   </div>
                   <p className="text-sm text-neutral-300 leading-relaxed whitespace-pre-wrap break-words">
                     {comment.content}

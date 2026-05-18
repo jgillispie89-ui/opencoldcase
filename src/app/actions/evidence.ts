@@ -2,6 +2,51 @@
 
 import { createClient } from '@/lib/supabase/server'
 
+export async function deleteEvidence(id: string): Promise<{ error?: string; success?: boolean }> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'You must be signed in.' }
+
+    const { data: row } = await supabase
+      .from('evidence').select('user_id, file_url').eq('id', id).single()
+    if (!row) return { error: 'Evidence not found.' }
+
+    if (row.user_id !== user.id) {
+      const { data: profile } = await supabase
+        .from('profiles').select('role').eq('id', user.id).single()
+      if (profile?.role !== 'super_admin')
+        return { error: 'You do not have permission to delete this evidence.' }
+    }
+
+    // Delete the storage file before removing the DB row
+    if (row.file_url) {
+      const marker = '/storage/v1/object/public/evidence/'
+      const idx = (row.file_url as string).indexOf(marker)
+      if (idx !== -1) {
+        const storagePath = (row.file_url as string).slice(idx + marker.length)
+        const { error: storageError } = await supabase.storage
+          .from('evidence').remove([storagePath])
+        if (storageError) {
+          // Non-fatal — log but continue with DB delete
+          console.error('[evidence] storage delete failed:', storageError.message)
+        }
+      }
+    }
+
+    const { error } = await supabase.from('evidence').delete().eq('id', id)
+    if (error) {
+      console.error('[evidence] deleteEvidence failed:', error.message)
+      return { error: error.message }
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('[evidence] unexpected exception in deleteEvidence:', err)
+    return { error: 'An unexpected error occurred.' }
+  }
+}
+
 export async function postEvidence(
   caseId: string,
   title: string,

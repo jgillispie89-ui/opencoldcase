@@ -2,6 +2,36 @@
 
 import { createClient } from '@/lib/supabase/server'
 
+export async function deleteTheory(id: string): Promise<{ error?: string; success?: boolean }> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'You must be signed in.' }
+
+    const { data: row } = await supabase
+      .from('theories').select('user_id').eq('id', id).single()
+    if (!row) return { error: 'Theory not found.' }
+
+    if (row.user_id !== user.id) {
+      const { data: profile } = await supabase
+        .from('profiles').select('role').eq('id', user.id).single()
+      if (profile?.role !== 'super_admin')
+        return { error: 'You do not have permission to delete this theory.' }
+    }
+
+    const { error } = await supabase.from('theories').delete().eq('id', id)
+    if (error) {
+      console.error('[theories] deleteTheory failed:', error.message)
+      return { error: error.message }
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('[theories] unexpected exception in deleteTheory:', err)
+    return { error: 'An unexpected error occurred.' }
+  }
+}
+
 export async function postTheory(
   caseId: string,
   title: string,

@@ -203,6 +203,7 @@ export default async function CasePage({ params }: PageProps) {
         <CaseTabs
           caseId={id}
           isLoggedIn={isLoggedIn}
+          isSuperAdmin={isSuperAdmin}
           userId={userId}
           userDisplayName={userDisplayName}
           initialDiscussions={discussions}

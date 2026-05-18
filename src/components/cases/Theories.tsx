@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import RelativeTime from '@/components/ui/RelativeTime'
-import { postTheory, toggleUpvote } from '@/app/actions/theories'
+import { postTheory, toggleUpvote, deleteTheory } from '@/app/actions/theories'
 
 export type TheoryRow = {
   id: string
@@ -44,6 +44,7 @@ interface Props {
   caseId: string
   isLoggedIn: boolean
   userId: string | null
+  isSuperAdmin: boolean
   userDisplayName: string | null
   initialTheories: TheoryRow[]
   initialUpvotedIds: string[]
@@ -56,7 +57,7 @@ const inputCls = [
 ].join(' ')
 
 export default function Theories({
-  caseId, isLoggedIn, userId, userDisplayName,
+  caseId, isLoggedIn, userId, isSuperAdmin, userDisplayName,
   initialTheories, initialUpvotedIds,
 }: Props) {
   const [theories,     setTheories]     = useState<TheoryRow[]>(initialTheories)
@@ -67,7 +68,20 @@ export default function Theories({
   const [content,     setContent]     = useState('')
   const [formError,   setFormError]   = useState<string | null>(null)
   const [saveError,   setSaveError]   = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  async function handleDelete(theoryId: string) {
+    if (!confirm('Delete this theory? This cannot be undone.')) return
+    const snapshot = theories
+    setTheories(prev => prev.filter(t => t.id !== theoryId))
+    setDeleteError(null)
+    const result = await deleteTheory(theoryId)
+    if (result?.error) {
+      setTheories(snapshot)
+      setDeleteError(result.error)
+    }
+  }
 
   // ── Upvote ──────────────────────────────────────────────────────────────────
 
@@ -241,6 +255,12 @@ export default function Theories({
         </div>
       )}
 
+      {deleteError && (
+        <p className="text-red-300 text-sm bg-red-950/50 border border-red-800 rounded-lg px-4 py-2.5">
+          {deleteError}
+        </p>
+      )}
+
       {/* Theory list */}
       {theories.length === 0 ? (
         <div className="flex flex-col items-center py-14 text-center">
@@ -274,11 +294,27 @@ export default function Theories({
 
                 {/* Footer */}
                 <div className="flex items-center justify-between border-t border-neutral-800 pt-3 gap-3 flex-wrap">
-                  <div className="text-xs text-neutral-500 flex items-center gap-1.5">
+                  <div className="text-xs text-neutral-500 flex items-center gap-1.5 flex-wrap">
                     <span className="text-neutral-300 font-medium">{name}</span>
                     <span>·</span>
                     <RelativeTime date={theory.created_at} />
                     {theory._optimistic && <span className="italic text-neutral-700">posting…</span>}
+                    {!theory._optimistic && (theory.user_id === userId || isSuperAdmin) && (() => {
+                      const isAdminAction = isSuperAdmin && theory.user_id !== userId
+                      return (
+                        <button
+                          onClick={() => handleDelete(theory.id)}
+                          title={isAdminAction ? 'Admin remove' : 'Delete'}
+                          className={`transition-colors ${
+                            isAdminAction
+                              ? 'text-amber-800 hover:text-amber-500'
+                              : 'text-neutral-700 hover:text-red-400'
+                          }`}
+                        >
+                          {isAdminAction ? '· Admin remove' : '· Delete'}
+                        </button>
+                      )
+                    })()}
                   </div>
 
                   <button

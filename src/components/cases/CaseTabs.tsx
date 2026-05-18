@@ -11,6 +11,7 @@ type Tab = 'discussion' | 'evidence' | 'theories' | 'notebook'
 interface Props {
   caseId: string
   isLoggedIn: boolean
+  isSuperAdmin: boolean
   userId: string | null
   userDisplayName: string | null
   initialDiscussions: DiscussionRow[]
@@ -21,7 +22,7 @@ interface Props {
 }
 
 export default function CaseTabs({
-  caseId, isLoggedIn, userId, userDisplayName,
+  caseId, isLoggedIn, isSuperAdmin, userId, userDisplayName,
   initialDiscussions, initialEvidence, initialTheories, initialUpvotedIds,
   initialNotebookContent,
 }: Props) {
@@ -60,6 +61,8 @@ export default function CaseTabs({
           <Discussion
             caseId={caseId}
             isLoggedIn={isLoggedIn}
+            userId={userId}
+            isSuperAdmin={isSuperAdmin}
             userDisplayName={userDisplayName}
             initialDiscussions={initialDiscussions}
           />
@@ -69,6 +72,7 @@ export default function CaseTabs({
             caseId={caseId}
             isLoggedIn={isLoggedIn}
             userId={userId}
+            isSuperAdmin={isSuperAdmin}
             userDisplayName={userDisplayName}
             initialEvidence={initialEvidence}
           />
@@ -78,6 +82,7 @@ export default function CaseTabs({
             caseId={caseId}
             isLoggedIn={isLoggedIn}
             userId={userId}
+            isSuperAdmin={isSuperAdmin}
             userDisplayName={userDisplayName}
             initialTheories={initialTheories}
             initialUpvotedIds={initialUpvotedIds}

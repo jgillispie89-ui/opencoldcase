@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import RelativeTime from '@/components/ui/RelativeTime'
 import { createClient } from '@/lib/supabase/client'
-import { postEvidence } from '@/app/actions/evidence'
+import { postEvidence, deleteEvidence } from '@/app/actions/evidence'
 
 export type EvidenceRow = {
   id: string
@@ -62,6 +62,7 @@ interface Props {
   caseId: string
   isLoggedIn: boolean
   userId: string | null
+  isSuperAdmin: boolean
   userDisplayName: string | null
   initialEvidence: EvidenceRow[]
 }
@@ -73,7 +74,7 @@ const inputCls = [
 ].join(' ')
 
 export default function Evidence({
-  caseId, isLoggedIn, userId, userDisplayName, initialEvidence,
+  caseId, isLoggedIn, userId, isSuperAdmin, userDisplayName, initialEvidence,
 }: Props) {
   const [items,        setItems]        = useState<EvidenceRow[]>(initialEvidence)
   const [title,        setTitle]        = useState('')
@@ -86,6 +87,18 @@ export default function Evidence({
   const [lightboxUrl,  setLightboxUrl]  = useState<string | null>(null)
 
   const hasContent = description.trim() || file || sourceUrl.trim()
+
+  async function handleDelete(itemId: string) {
+    if (!confirm('Delete this evidence? This cannot be undone.')) return
+    const snapshot = items
+    setItems(prev => prev.filter(i => i.id !== itemId))
+    setSaveError(null)
+    const result = await deleteEvidence(itemId)
+    if (result?.error) {
+      setItems(snapshot)
+      setSaveError(result.error)
+    }
+  }
 
   // ── Submit ──────────────────────────────────────────────────────────────────
 
@@ -376,11 +389,27 @@ export default function Evidence({
                   )}
 
                   {/* Footer */}
-                  <div className="flex items-center gap-1.5 text-xs text-neutral-500 mt-3 pt-3 border-t border-neutral-800">
+                  <div className="flex items-center gap-1.5 text-xs text-neutral-500 mt-3 pt-3 border-t border-neutral-800 flex-wrap">
                     <span className="text-neutral-300 font-medium">{name}</span>
                     <span>·</span>
                     <RelativeTime date={item.created_at} />
                     {item._optimistic && <span className="italic text-neutral-700">saving…</span>}
+                    {!item._optimistic && (item.user_id === userId || isSuperAdmin) && (() => {
+                      const isAdminAction = isSuperAdmin && item.user_id !== userId
+                      return (
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          title={isAdminAction ? 'Admin remove' : 'Delete'}
+                          className={`transition-colors ${
+                            isAdminAction
+                              ? 'text-amber-800 hover:text-amber-500'
+                              : 'text-neutral-700 hover:text-red-400'
+                          }`}
+                        >
+                          {isAdminAction ? '· Admin remove' : '· Delete'}
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
               </li>
