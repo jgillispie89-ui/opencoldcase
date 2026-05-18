@@ -56,7 +56,7 @@ export default async function CasePage({ params }: PageProps) {
     { data: notebookRow },
   ] = await Promise.all([
     supabase
-      .from('profiles').select('display_name')
+      .from('profiles').select('display_name, username')
       .eq('id', coldCase.created_by).single(),
 
     // Fetch without FK-dependent join — profiles resolved manually below
@@ -102,26 +102,31 @@ export default async function CasePage({ params }: PageProps) {
   ])]
 
   const { data: authorProfiles, error: authorProfilesError } = allAuthorIds.length > 0
-    ? await supabase.from('profiles').select('id, display_name').in('id', allAuthorIds)
-    : { data: [] as { id: string; display_name: string }[], error: null }
+    ? await supabase.from('profiles').select('id, display_name, username').in('id', allAuthorIds)
+    : { data: [] as { id: string; display_name: string; username: string | null }[], error: null }
 
   if (authorProfilesError) console.error('[CasePage] authorProfiles query error:', authorProfilesError)
 
-  const profileMap = Object.fromEntries((authorProfiles ?? []).map(p => [p.id, p.display_name]))
+  const profileMap = Object.fromEntries(
+    ((authorProfiles ?? []) as { id: string; display_name: string; username?: string | null }[]).map(p => [
+      p.id,
+      { display_name: p.display_name, username: p.username ?? null },
+    ])
+  )
 
   const discussions = (rawDiscussions ?? []).map(d => ({
     ...d,
-    profiles: { display_name: profileMap[d.user_id as string] ?? null },
+    profiles: profileMap[d.user_id as string] ?? null,
   })) as DiscussionRow[]
 
   const evidence = (rawEvidence ?? []).map(e => ({
     ...e,
-    profiles: { display_name: profileMap[e.user_id as string] ?? null },
+    profiles: profileMap[e.user_id as string] ?? null,
   })) as EvidenceRow[]
 
   const theories = (rawTheories ?? []).map(t => ({
     ...t,
-    profiles: { display_name: profileMap[t.user_id as string] ?? null },
+    profiles: profileMap[t.user_id as string] ?? null,
   })) as TheoryRow[]
 
   // Only keep upvote IDs that belong to theories on this case
@@ -188,7 +193,17 @@ export default async function CasePage({ params }: PageProps) {
               </span>
             )}
             <span className="text-neutral-600 text-xs">
-              Submitted by <span className="text-neutral-500">{creator?.display_name ?? 'unknown'}</span>
+              Submitted by{' '}
+              {(creator as { display_name?: string; username?: string | null } | null)?.username ? (
+                <Link
+                  href={`/profile/${(creator as { username: string }).username}`}
+                  className="text-neutral-500 hover:text-red-400 transition-colors"
+                >
+                  {creator?.display_name ?? 'unknown'}
+                </Link>
+              ) : (
+                <span className="text-neutral-500">{creator?.display_name ?? 'unknown'}</span>
+              )}
             </span>
           </div>
 

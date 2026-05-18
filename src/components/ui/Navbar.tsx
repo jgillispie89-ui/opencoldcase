@@ -8,14 +8,16 @@ export default async function Navbar() {
 
   let displayName: string | null = null
   let isSuperAdmin = false
+  let ownUsername: string | null = null
   if (user) {
     const { data } = await supabase
       .from('profiles')
-      .select('display_name, role')
+      .select('display_name, role, username')
       .eq('id', user.id)
       .single()
     displayName  = data?.display_name ?? null
     isSuperAdmin = data?.role === 'super_admin'
+    ownUsername  = (data as { username?: string | null } | null)?.username ?? null
   }
 
   return (
@@ -32,13 +34,24 @@ export default async function Navbar() {
         {user ? (
           <>
             <span className="flex items-center gap-2">
-              <span className="text-neutral-300 font-medium">{displayName ?? user.email}</span>
+              {ownUsername ? (
+                <Link href={`/profile/${ownUsername}`} className="text-neutral-300 font-medium hover:text-red-300 transition-colors">
+                  {displayName ?? user.email}
+                </Link>
+              ) : (
+                <span className="text-neutral-300 font-medium">{displayName ?? user.email}</span>
+              )}
               {isSuperAdmin && (
                 <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 leading-none">
                   Admin
                 </span>
               )}
             </span>
+            {ownUsername && (
+              <Link href={`/profile/${ownUsername}`} className="text-xs text-neutral-600 hover:text-neutral-400 transition-colors">
+                View Profile
+              </Link>
+            )}
             <SignOutButton />
             <Link
               href="/cases/submit"

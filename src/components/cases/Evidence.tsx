@@ -15,7 +15,7 @@ export type EvidenceRow = {
   file_url: string | null
   source_url: string | null
   created_at: string
-  profiles: { display_name: string } | null
+  profiles: { display_name: string; username?: string | null } | null
   _optimistic?: boolean
 }
 
@@ -122,7 +122,7 @@ export default function Evidence({
       file_url: null,
       source_url: trimUrl || null,
       created_at: new Date().toISOString(),
-      profiles: { display_name: userDisplayName ?? 'You' },
+      profiles: { display_name: userDisplayName ?? 'You', username: null },
       _optimistic: true,
     }
     setItems(prev => [optimistic, ...prev])
@@ -321,7 +321,8 @@ export default function Evidence({
       ) : (
         <ul className="space-y-4">
           {items.map(item => {
-            const name = item.profiles?.display_name ?? 'Unknown'
+            const name     = item.profiles?.display_name ?? 'Unknown'
+            const username = !item._optimistic ? (item.profiles?.username ?? null) : null
 
             return (
               <li
@@ -390,7 +391,11 @@ export default function Evidence({
 
                   {/* Footer */}
                   <div className="flex items-center gap-1.5 text-xs text-neutral-500 mt-3 pt-3 border-t border-neutral-800 flex-wrap">
-                    <span className="text-neutral-300 font-medium">{name}</span>
+                    {username ? (
+                      <Link href={`/profile/${username}`} className="text-neutral-300 font-medium hover:text-red-400 transition-colors">{name}</Link>
+                    ) : (
+                      <span className="text-neutral-300 font-medium">{name}</span>
+                    )}
                     <span>·</span>
                     <RelativeTime date={item.created_at} />
                     {item._optimistic && <span className="italic text-neutral-700">saving…</span>}

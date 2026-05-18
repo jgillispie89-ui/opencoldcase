@@ -11,7 +11,7 @@ export type DiscussionRow = {
   user_id: string
   content: string
   created_at: string
-  profiles: { display_name: string } | null
+  profiles: { display_name: string; username?: string | null } | null
   _optimistic?: boolean
 }
 
@@ -94,7 +94,7 @@ export default function Discussion({
       user_id:    'pending',
       content:    trimmed,
       created_at: new Date().toISOString(),
-      profiles:   { display_name: userDisplayName ?? 'You' },
+      profiles:   { display_name: userDisplayName ?? 'You', username: null },
       _optimistic: true,
     }
 
@@ -176,9 +176,10 @@ export default function Discussion({
       ) : (
         <ul className="space-y-5">
           {comments.map(comment => {
-            const name    = comment.profiles?.display_name ?? 'Unknown'
-            const initial = name.charAt(0).toUpperCase()
-            const color   = comment._optimistic ? 'bg-neutral-700' : avatarColor(name)
+            const name     = comment.profiles?.display_name ?? 'Unknown'
+            const username = !comment._optimistic ? (comment.profiles?.username ?? null) : null
+            const initial  = name.charAt(0).toUpperCase()
+            const color    = comment._optimistic ? 'bg-neutral-700' : avatarColor(name)
 
             return (
               <li key={comment.id} className={`flex gap-3 transition-opacity ${comment._optimistic ? 'opacity-55' : ''}`}>
@@ -191,7 +192,11 @@ export default function Discussion({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-sm font-semibold text-neutral-200">{name}</span>
+                      {username ? (
+                        <Link href={`/profile/${username}`} className="text-sm font-semibold text-neutral-200 hover:text-red-400 transition-colors">{name}</Link>
+                      ) : (
+                        <span className="text-sm font-semibold text-neutral-200">{name}</span>
+                      )}
                       <span className="text-xs text-neutral-600"><RelativeTime date={comment.created_at} /></span>
                       {comment._optimistic && (
                         <span className="text-xs text-neutral-700 italic">posting…</span>

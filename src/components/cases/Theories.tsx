@@ -14,7 +14,7 @@ export type TheoryRow = {
   upvotes: number
   created_at: string
   updated_at: string
-  profiles: { display_name: string } | null
+  profiles: { display_name: string; username?: string | null } | null
   _optimistic?: boolean
 }
 
@@ -152,7 +152,7 @@ export default function Theories({
       id: tempId, case_id: caseId, user_id: userId ?? 'pending',
       title: trimTitle, content: trimContent, upvotes: 0,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-      profiles: { display_name: userDisplayName ?? 'You' },
+      profiles: { display_name: userDisplayName ?? 'You', username: null },
       _optimistic: true,
     }
 
@@ -172,7 +172,7 @@ export default function Theories({
       } else if (result?.theory) {
         setTheories(prev =>
           prev.map(t => t.id === tempId
-            ? { ...t, ...result.theory!, profiles: { display_name: userDisplayName ?? 'You' }, _optimistic: false }
+            ? { ...t, ...result.theory!, profiles: { display_name: userDisplayName ?? 'You', username: null }, _optimistic: false }
             : t
           )
         )
@@ -272,6 +272,7 @@ export default function Theories({
         <ul className="space-y-4">
           {theories.map(theory => {
             const name      = theory.profiles?.display_name ?? 'Unknown'
+            const username  = !theory._optimistic ? (theory.profiles?.username ?? null) : null
             const isUpvoted = upvotedIds.has(theory.id)
             const isPending = pendingVotes.has(theory.id)
 
@@ -295,7 +296,11 @@ export default function Theories({
                 {/* Footer */}
                 <div className="flex items-center justify-between border-t border-neutral-800 pt-3 gap-3 flex-wrap">
                   <div className="text-xs text-neutral-500 flex items-center gap-1.5 flex-wrap">
-                    <span className="text-neutral-300 font-medium">{name}</span>
+                    {username ? (
+                      <Link href={`/profile/${username}`} className="text-neutral-300 font-medium hover:text-red-400 transition-colors">{name}</Link>
+                    ) : (
+                      <span className="text-neutral-300 font-medium">{name}</span>
+                    )}
                     <span>·</span>
                     <RelativeTime date={theory.created_at} />
                     {theory._optimistic && <span className="italic text-neutral-700">posting…</span>}
