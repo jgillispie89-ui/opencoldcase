@@ -1,14 +1,22 @@
 'use client'
 
 import { useActionState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { signIn, type AuthState } from '@/app/actions/auth'
 
 export default function LoginForm() {
   const [state, formAction, isPending] = useActionState<AuthState, FormData>(signIn, null)
+  const searchParams = useSearchParams()
+  const linkExpired  = searchParams.get('error') === 'link_expired'
 
   return (
     <form action={formAction} className="space-y-5">
+      {linkExpired && (
+        <div className="bg-amber-950/60 border border-amber-800 text-amber-300 text-sm px-4 py-3 rounded-lg leading-snug">
+          That reset link has expired or already been used. Request a new one below.
+        </div>
+      )}
       {state?.error && (
         <div className="bg-red-950/60 border border-red-800 text-red-300 text-sm px-4 py-3 rounded-lg leading-snug">
           {state.error}
@@ -31,9 +39,17 @@ export default function LoginForm() {
       </div>
 
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-neutral-300 mb-1.5">
-          Password
-        </label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label htmlFor="password" className="block text-sm font-medium text-neutral-300">
+            Password
+          </label>
+          <Link
+            href="/forgot-password"
+            className="text-xs text-neutral-500 hover:text-red-400 transition-colors"
+          >
+            Forgot password?
+          </Link>
+        </div>
         <input
           id="password"
           name="password"

@@ -46,6 +46,8 @@ export default function SignUpForm() {
           required
           autoComplete="email"
           placeholder="you@example.com"
+          onInvalid={e => (e.target as HTMLInputElement).setCustomValidity('Enter a valid email address (e.g. you@example.com)')}
+          onInput={e => (e.target as HTMLInputElement).setCustomValidity('')}
           className="w-full bg-neutral-800 border border-neutral-700 text-neutral-100 placeholder-neutral-500 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30 transition-colors"
         />
       </div>

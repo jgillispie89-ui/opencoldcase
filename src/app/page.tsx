@@ -1,5 +1,6 @@
 import Navbar from '@/components/ui/Navbar'
 import CaseMapWrapper from '@/components/map/CaseMapWrapper'
+import ResetSuccessBanner from '@/components/ui/ResetSuccessBanner'
 import { createClient } from '@/lib/supabase/server'
 import type { ColdCase } from '@/types'
 
@@ -10,7 +11,12 @@ const STATUS_LEGEND = [
   { label: 'Solved',               color: '#4ade80' },
 ]
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reset?: string }>
+}) {
+  const { reset } = await searchParams
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('cases')
@@ -22,6 +28,7 @@ export default async function HomePage() {
   return (
     <div className="flex flex-col h-screen">
       <Navbar />
+      {reset === 'success' && <ResetSuccessBanner />}
 
       {/* Map fills all remaining vertical space */}
       <div className="relative flex-1 overflow-hidden">
